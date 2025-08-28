@@ -3,6 +3,7 @@ import express from "express";
 import dotenv from "dotenv";
 import morgan from "morgan";
 import cors from "cors";
+import mongoose from "mongoose";
 
 // Import routes
 
@@ -16,3 +17,17 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 // Routes
+
+mongoose
+  .connect(process.env.MONGODB_URL)
+  .then(() => {
+    app.listen(process.env.PORT, () => {
+      console.log(
+        "Working and Running!!! Connected to db & listening on port",
+        process.env.PORT
+      );
+    });
+  })
+  .catch((error) => {
+    console.log(error);
+  });
