@@ -6,6 +6,8 @@ import cors from "cors";
 import mongoose from "mongoose";
 
 // Import routes
+import riderRouter from "./routes/rider.routes.js";
+import cooperativeRouter from "./routes/cooperative.routes.js";
 
 dotenv.config();
 const app = express();
@@ -17,6 +19,8 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 // Routes
+app.use(API_BASE + "/riders", riderRouter);
+app.use(API_BASE + "/cooperatives", cooperativeRouter);
 
 mongoose
   .connect(process.env.MONGODB_URL)

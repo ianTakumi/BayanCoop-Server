@@ -5,7 +5,35 @@ import User from "../models/user.model.js";
 // Rider Registration
 export const riderRegistration = async (req, res) => {
   try {
-    const { name, email, phoneNumber } = req.body;
+    const { name, email, phoneNumber, password } = req.body;
+
+    if (!name || !email || !phoneNumber || !password) {
+      return res.status(400).json({
+        message: "Please provide all the necessary fields",
+        success: false,
+      });
+    }
+
+    const rider = await Rider.findOne({ email: email });
+
+    if (!rider) {
+      const newRider = new Rider({
+        name,
+        email,
+        phoneNumber,
+        password,
+      });
+
+      await newRider.save();
+      return res.status(201).json({
+        message: "Successfully created rider account",
+        success: true,
+      });
+    } else {
+      return res
+        .status(400)
+        .json({ message: "Email already exists", success: false });
+    }
   } catch (err) {
     console.error(err.message);
     return res.status(500).json({ message: "Server Error" });

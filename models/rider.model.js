@@ -20,6 +20,12 @@ const riderSchema = new mongoose.Schema(
       required: [true, "Please enter the rider's phone number"],
       unique: true,
     },
+    password: {
+      type: String,
+      required: [true, "Please enter the rider's password"],
+      select: false,
+      minlength: [6, "Password must be at least 6 characters long"],
+    },
   },
   { timestamps: true }
 );
