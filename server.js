@@ -7,6 +7,8 @@ import cors from "cors";
 // Import routes
 import authRoutes from "./routes/auth.routes.js";
 import contactRoutes from "./routes/contact.routes.js";
+import userRoutes from "./routes/user.routes.js";
+import coopRoutes from "./routes/cooperative.route.js";
 
 dotenv.config();
 const app = express();
@@ -20,6 +22,8 @@ app.use(morgan("dev"));
 // Routes
 app.use(API_BASE + "/auth", authRoutes);
 app.use(API_BASE + "/contacts", contactRoutes);
+app.use(API_BASE + "/users", userRoutes);
+app.use(API_BASE + "/coops", coopRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;
