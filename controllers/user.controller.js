@@ -207,3 +207,100 @@ export const unsuspendUser = async (req, res) => {
     });
   }
 };
+
+// Update user profile
+export const updateUserProfile = async (req, res) => {
+  try {
+    const {
+      email,
+      first_name,
+      last_name,
+      phone,
+      address,
+      region,
+      province,
+      city,
+      barangay,
+    } = req.body;
+    const { userId } = req.params;
+
+    if (
+      !email ||
+      !first_name ||
+      !last_name ||
+      !phone ||
+      !address ||
+      !region ||
+      !province ||
+      !city ||
+      !barangay
+    ) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Validate user ID
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    const { data: authData, error: authError } =
+      await supabase.auth.admin.updateUserById(userId, {
+        email: email,
+        user_metadata: {
+          first_name: first_name,
+          last_name: last_name,
+          phone: phone,
+        },
+      });
+
+    if (authError) {
+      console.log("Auth update error:", authError);
+      return res.status(400).json({
+        message: "Failed to update auth profile",
+        error: authError.message,
+      });
+    }
+
+    const { data: dbData, error: dbError } = await supabase
+      .from("users")
+      .update({
+        email: email,
+        first_name: first_name,
+        last_name: last_name,
+        phone: phone,
+        address: address,
+        region: region,
+        province: province,
+        city: city,
+        barangay: barangay,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select();
+
+    if (dbError) {
+      console.log("Database update error:", dbError);
+      return res.status(400).json({
+        message: "Failed to update user in database",
+        error: dbError.message,
+      });
+    }
+
+    // Check if user was actually updated in database
+    if (!dbData || dbData.length === 0) {
+      return res.status(404).json({ message: "User not found in database" });
+    }
+
+    console.log(dbData[0]);
+    return res.status(200).json({
+      message: "Profile updated successfully",
+      user: dbData[0],
+    });
+  } catch (err) {
+    console.log("Unexpected error:", err);
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};

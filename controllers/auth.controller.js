@@ -70,9 +70,6 @@ export const userRegister = async (req, res) => {
   }
 };
 
-// Coop registration
-export const coopRegister = async (req, res) => {};
-
 // Courier register
 export const courierRegister = async (req, res) => {};
 
@@ -123,8 +120,89 @@ export const userLogin = async (req, res) => {
   }
 };
 
-// Coop login
-export const coopLogin = async (req, res) => {};
-
 // Curier Login
 export const courierLogin = async (req, res) => {};
+
+// Send password reset email
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // First, get the user by email to retrieve the user ID
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
+
+    if (userError || !userData) {
+      console.log("User not found:", userError);
+      return res.status(400).json({
+        message: "No account found with this email address",
+      });
+    }
+
+    const userId = userData.id;
+
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.CLIENT_URL}/reset-password/`,
+    });
+
+    if (error) {
+      console.log("Forgot password error:", error);
+      return res.status(400).json({
+        message: "Failed to send reset email",
+        error: error.message,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Password reset email sent successfully",
+    });
+  } catch (err) {
+    console.log("Unexpected error:", err);
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};
+
+// Reset password
+export const resetPassword = async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    const { userId } = req.params;
+
+    if (!newPassword) {
+      return res.status(400).json({ message: "New password is required" });
+    }
+
+    // Method 1: Update current user's password (requires user session)
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) {
+      console.log("Update password error:", error);
+      return res.status(400).json({
+        message: "Failed to update password",
+        error: error.message,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Password updated successfully",
+    });
+  } catch (err) {
+    console.log("Unexpected error:", err);
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};

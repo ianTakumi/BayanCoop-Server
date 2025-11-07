@@ -24,7 +24,7 @@ export const getTotalCount = async (req, res) => {
 export const getCooperatives = async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from("coopertives")
+      .from("cooperatives")
       .select("*")
       .order("created_at", { ascending: false });
 

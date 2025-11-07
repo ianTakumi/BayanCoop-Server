@@ -3,6 +3,7 @@ import {
   getAllUsers,
   getActiveUsers,
   getInactiveUsers,
+  updateUserProfile,
 } from "../controllers/user.controller.js";
 import express from "express";
 
@@ -19,5 +20,8 @@ router.get("/total-active-users", getActiveUsers);
 
 // Get total # of inactive users
 router.get("/total-inactive-users", getInactiveUsers);
+
+// Update user profile
+router.put("/profileUpdate/:userId", updateUserProfile);
 
 export default router;

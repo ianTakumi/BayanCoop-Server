@@ -1,4 +1,9 @@
-import { userRegister, userLogin } from "../controllers/auth.controller.js";
+import {
+  userRegister,
+  userLogin,
+  forgotPassword,
+  resetPassword,
+} from "../controllers/auth.controller.js";
 import express from "express";
 
 const router = express.Router();
@@ -9,8 +14,10 @@ router.post("/user-registration", userRegister);
 // User login
 router.post("/user-login", userLogin);
 
-// Coop registration
+// Forget Password
+router.post("/forgot-password", forgotPassword);
 
-// Courier Registration
+// reset  password
+router.post("/reset-password", resetPassword);
 
 export default router;
