@@ -20,6 +20,46 @@ export const getTotalCount = async (req, res) => {
   }
 };
 
+// Get single coop
+export const getSingleCoop = async (req, res) => {
+  try {
+    const { coopId } = req.params;
+
+    if (!coopId) {
+      return res.status(400).json({ message: "Coop ID is required" });
+    }
+
+    // Get single coop by ID
+    const { data, error } = await supabase
+      .from("cooperatives")
+      .select("*")
+      .eq("id", coopId)
+      .single(); // Use .single() to get only one record
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        // Record not found
+        return res.status(404).json({ message: "Cooperative not found" });
+      }
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ message: "Cooperative not found" });
+    }
+
+    return res.status(200).json({
+      message: "Cooperative retrieved successfully",
+      data: data,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};
+
 // Get all cooperatives for admin
 export const getCooperatives = async (req, res) => {
   try {
@@ -119,8 +159,81 @@ export const createCooperative = async (req, res) => {
 // Update profile
 export const updateCooperative = async (req, res) => {
   try {
+    const {
+      coopName,
+      email,
+      phone,
+      regionName,
+      provinceName,
+      cityName,
+      barangayName,
+      postalCode,
+      address,
+      completeAddress,
+      latitude,
+      longitude,
+    } = req.body;
+    const coopId = req.params;
+
+    if (
+      !coopName ||
+      !email ||
+      !phone ||
+      !regionName ||
+      !provinceName ||
+      !cityName ||
+      !barangayName ||
+      !postalCode ||
+      !address ||
+      !completeAddress ||
+      !latitude ||
+      !longitude
+    ) {
+      return res.status(400).json({ message: "Please fill up all the fields" });
+    }
+
+    if (!coopId) {
+      return res.status(400).json({ message: "Coop ID is required" });
+    }
+
+    const { data, error } = await supabase
+      .from("cooperatives")
+      .update({
+        name: coopName,
+        email,
+        phone,
+        province: provinceName,
+        region: regionName,
+        city: cityName,
+        barangay: barangayName,
+        postalCode,
+        address,
+        completeAddress,
+        latitude,
+        longitude,
+      })
+      .eq("id", coopId)
+      .select();
+
+    if (error) throw error;
+
+    return res
+      .status(200)
+      .json({ message: "Coop updated successfully", coop: data[0] });
   } catch (err) {
     console.error("Update cooperative error:", err.message);
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};
+
+// Soft delete coop
+export const softDelete = async (req, res) => {
+  try {
+  } catch (err) {
+    console.error("Delete contact error:", err.message);
     return res.status(500).json({
       message: "Server Error",
       error: err.message,
