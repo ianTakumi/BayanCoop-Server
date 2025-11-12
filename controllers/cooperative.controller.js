@@ -60,6 +60,42 @@ export const getSingleCoop = async (req, res) => {
   }
 };
 
+// Get coop based on user id
+export const getCoopBasedOnOwner = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    console.log(userId);
+    if (!userId || userId.trim() === "") {
+      return res.status(400).json({
+        message: "Valid user id is required",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("cooperatives")
+      .select("*")
+      .eq("user_id", userId);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({
+        message: "No cooperative found for this user",
+      });
+    }
+
+    return res
+      .status(200)
+      .json({ message: "Successfully fetched coop info", coop: data });
+  } catch (err) {
+    console.log("Something went wrong: ", err);
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};
+
 // Get all cooperatives for admin
 export const getCooperatives = async (req, res) => {
   try {
@@ -222,6 +258,48 @@ export const updateCooperative = async (req, res) => {
       .json({ message: "Coop updated successfully", coop: data[0] });
   } catch (err) {
     console.error("Update cooperative error:", err.message);
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};
+
+// Update coop status (approve/reject)
+export const updateCoopStatus = async (req, res) => {
+  try {
+    const { coopId } = req.params;
+    const { isApproved } = req.body;
+
+    if (!coopId) {
+      return res.status(400).json({ message: "Cooperative ID is required" });
+    }
+
+    if (typeof isApproved !== "boolean") {
+      return res
+        .status(400)
+        .json({ message: "isApproved must be a boolean value" });
+    }
+
+    const { data, error } = await supabase
+      .from("cooperatives")
+      .update({ isApproved: isApproved })
+      .eq("id", coopId)
+      .select();
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ message: "Cooperative not found" });
+    }
+
+    const status = isApproved ? "approved" : "rejected";
+    res.status(200).json({
+      message: `Cooperative successfully ${status}`,
+      data: data[0],
+    });
+  } catch (err) {
+    console.error("Update coop status error:", err.message);
     return res.status(500).json({
       message: "Server Error",
       error: err.message,

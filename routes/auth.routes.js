@@ -3,10 +3,14 @@ import {
   userLogin,
   forgotPassword,
   resetPassword,
+  verifyUser,
 } from "../controllers/auth.controller.js";
 import express from "express";
 
 const router = express.Router();
+
+// User verify
+router.get("/verify-email", verifyUser);
 
 // User Registration
 router.post("/user-registration", userRegister);

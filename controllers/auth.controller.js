@@ -1,20 +1,24 @@
 import { supabase } from "../utils/supabase_client.js";
+import { sendVerificationEmail } from "../configs/nodemailer.config.js";
 
 // User Registration
+import jwt from "jsonwebtoken";
+
 export const userRegister = async (req, res) => {
   try {
     const { firstName, lastName, phone, email, password } = req.body;
 
+    // Create user with email confirmation disabled
     const { data: authUser, error: authError } =
       await supabase.auth.admin.createUser({
         email,
         password,
-        email_confirm: false,
+        email_confirm: false, // User needs to verify email
         user_metadata: {
           first_name: firstName,
           last_name: lastName,
           phone,
-          role: "user",
+          role: "admin",
         },
       });
 
@@ -25,6 +29,7 @@ export const userRegister = async (req, res) => {
 
     const userId = authUser.user.id;
 
+    // Insert user record in your custom users table
     const { data: userRecord, error: insertError } = await supabase
       .from("users")
       .insert([
@@ -42,30 +47,129 @@ export const userRegister = async (req, res) => {
 
     if (insertError) {
       console.error("DB insert error:", insertError.message);
+
+      // Clean up: delete the auth user if DB insert fails
+      await supabase.auth.admin.deleteUser(userId);
+
       return res.status(400).json({ error: insertError.message });
     }
 
-    const { error: emailError } = await supabase.auth.resend({
-      type: "signup",
-      email: email,
-      options: {
-        emailRedirectTo: "http://localhost:3000/auth/callback",
+    // Generate JWT verification token
+    const verificationToken = jwt.sign(
+      {
+        id: userId,
+        email: email,
+        type: "email_verification",
       },
-    });
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
 
-    if (emailError) {
-      console.error("Error sending verification email:", emailError.message);
+    // Send custom verification email with JWT token
+    try {
+      await sendVerificationEmail(
+        `${firstName} ${lastName}`,
+        email,
+        verificationToken
+      );
+    } catch (emailError) {
+      console.error("Custom email error:", emailError);
+
+      // Clean up if email fails
+      await supabase.auth.admin.deleteUser(userId);
+      await supabase.from("users").delete().eq("id", userId);
+
       return res
         .status(500)
-        .json({ error: "Error sending confirmation email" });
+        .json({ error: "Error sending verification email" });
     }
 
     return res.status(201).json({
-      message: "User registered successfully!",
+      message:
+        "User registered successfully! Please check your email for verification.",
       user: userRecord,
     });
   } catch (err) {
     console.error("Unexpected error:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const verifyUser = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ error: "Verification token is required" });
+    }
+
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Check if token is for email verification
+    if (decoded.type !== "email_verification") {
+      return res.status(400).json({ error: "Invalid token type" });
+    }
+
+    const userId = decoded.id;
+    const userEmail = decoded.email;
+
+    // Get current timestamp for email_confirmed_at
+    const currentTimestamp = new Date().toISOString();
+
+    // Update user email confirmation status in Supabase Auth
+    const { data: authUser, error: authError } =
+      await supabase.auth.admin.updateUserById(userId, {
+        email_confirm: true,
+        email_confirmed_at: currentTimestamp,
+      });
+
+    if (authError) {
+      console.error("Supabase auth update error:", authError.message);
+      return res
+        .status(400)
+        .json({ error: "Error confirming email in authentication system" });
+    }
+
+    // Update user status in custom users table
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .update({
+        status: "verified",
+        email_verified: true,
+        updated_at: currentTimestamp,
+      })
+      .eq("id", userId)
+      .select()
+      .single();
+
+    if (userError) {
+      console.error("Users table update error:", userError.message);
+      return res.status(400).json({ error: "Error updating user status" });
+    }
+
+    console.log(`✅ User ${userEmail} verified successfully`);
+
+    return res.status(200).json({
+      message: "Email verified successfully!",
+      user: {
+        id: userId,
+        email: userEmail,
+        status: "verified",
+        email_confirmed_at: currentTimestamp,
+      },
+    });
+  } catch (err) {
+    console.error("Unexpected error on verifying user:", err);
+
+    if (err.name === "TokenExpiredError") {
+      return res.status(400).json({ error: "Verification token has expired" });
+    }
+
+    if (err.name === "JsonWebTokenError") {
+      return res.status(400).json({ error: "Invalid verification token" });
+    }
+
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
