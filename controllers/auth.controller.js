@@ -13,12 +13,12 @@ export const userRegister = async (req, res) => {
       await supabase.auth.admin.createUser({
         email,
         password,
-        email_confirm: false, // User needs to verify email
+        email_confirm: false,
         user_metadata: {
           first_name: firstName,
           last_name: lastName,
           phone,
-          role: "admin",
+          role: "user",
         },
       });
 
