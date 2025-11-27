@@ -1,9 +1,8 @@
 import { supabase } from "../utils/supabase_client.js";
 import { sendVerificationEmail } from "../configs/nodemailer.config.js";
-
-// User Registration
 import jwt from "jsonwebtoken";
 
+// User Registration
 export const userRegister = async (req, res) => {
   try {
     const { firstName, lastName, phone, email, password } = req.body;
@@ -174,8 +173,49 @@ export const verifyUser = async (req, res) => {
   }
 };
 
-// Courier register
-export const courierRegister = async (req, res) => {};
+export const refreshSession = async (req, res) => {
+  try {
+    const { refresh_token } = req.body;
+    console.log(req.body);
+    if (!refresh_token) {
+      return res
+        .status(400)
+        .json({ message: "Refresh token is required", success: false });
+    }
+
+    const { data, error } = await supabase.auth.refreshSession({
+      refresh_token: refresh_token,
+    });
+
+    if (error) {
+      console.log("❌ Supabase refresh error:", error.message);
+      return res.status(401).json({
+        message: "Invalid or expired refresh token",
+        success: false,
+        error: error.message,
+      });
+    }
+
+    if (!data.session) {
+      return res.status(401).json({
+        message: "No session returned after refresh",
+        success: false,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Successfully refreshed the session",
+      success: true,
+      data: {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        session: data.session,
+      },
+    });
+  } catch (err) {
+    console.log("Error refreshing token", err);
+  }
+};
 
 // User login
 export const userLogin = async (req, res) => {
@@ -223,9 +263,6 @@ export const userLogin = async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 };
-
-// Curier Login
-export const courierLogin = async (req, res) => {};
 
 // Send password reset email
 export const forgotPassword = async (req, res) => {

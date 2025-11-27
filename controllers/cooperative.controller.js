@@ -64,7 +64,7 @@ export const getSingleCoop = async (req, res) => {
 export const getCoopBasedOnOwner = async (req, res) => {
   try {
     const { userId } = req.params;
-    console.log(userId);
+
     if (!userId || userId.trim() === "") {
       return res.status(400).json({
         message: "Valid user id is required",
@@ -79,6 +79,7 @@ export const getCoopBasedOnOwner = async (req, res) => {
     if (error) throw error;
 
     if (!data || data.length === 0) {
+      console.log("No coop");
       return res.status(404).json({
         message: "No cooperative found for this user",
       });

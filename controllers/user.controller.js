@@ -211,29 +211,36 @@ export const unsuspendUser = async (req, res) => {
 // Update user profile
 export const updateUserProfile = async (req, res) => {
   try {
+    console.log("Request body:", req.body);
+    console.log("User ID:", req.params.userId);
+
     const {
-      email,
       first_name,
       last_name,
+      email,
       phone,
       address,
       region,
       province,
       city,
       barangay,
+      dob,
+      gender,
     } = req.body;
     const { userId } = req.params;
 
     if (
-      !email ||
       !first_name ||
       !last_name ||
+      !email ||
       !phone ||
       !address ||
       !region ||
       !province ||
       !city ||
-      !barangay
+      !barangay ||
+      !dob ||
+      !gender
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -243,58 +250,149 @@ export const updateUserProfile = async (req, res) => {
       return res.status(400).json({ message: "User ID is required" });
     }
 
-    const { data: authData, error: authError } =
-      await supabase.auth.admin.updateUserById(userId, {
-        email: email,
-        user_metadata: {
-          first_name: first_name,
-          last_name: last_name,
-          phone: phone,
-        },
-      });
-
-    if (authError) {
-      console.log("Auth update error:", authError);
-      return res.status(400).json({
-        message: "Failed to update auth profile",
-        error: authError.message,
-      });
-    }
-
-    const { data: dbData, error: dbError } = await supabase
+    // Check if user exists first
+    const { data: existingUser, error: userCheckError } = await supabase
       .from("users")
-      .update({
-        email: email,
-        first_name: first_name,
-        last_name: last_name,
-        phone: phone,
-        address: address,
-        region: region,
-        province: province,
-        city: city,
-        barangay: barangay,
-        updated_at: new Date().toISOString(),
-      })
+      .select("id, email, phone, first_name, last_name")
       .eq("id", userId)
-      .select();
+      .single();
 
-    if (dbError) {
-      console.log("Database update error:", dbError);
-      return res.status(400).json({
-        message: "Failed to update user in database",
-        error: dbError.message,
+    if (userCheckError) {
+      console.log("User check error:", userCheckError);
+      return res.status(404).json({
+        message: "User not found in database",
+        error: userCheckError.message,
       });
     }
 
-    // Check if user was actually updated in database
-    if (!dbData || dbData.length === 0) {
+    if (!existingUser) {
       return res.status(404).json({ message: "User not found in database" });
     }
 
-    console.log(dbData[0]);
+    console.log("Existing user found:", existingUser);
+
+    // Check if email already exists (excluding current user) - only if email changed
+    if (email !== existingUser.email) {
+      const { data: existingEmail, error: emailCheckError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .neq("id", userId)
+        .single();
+
+      if (emailCheckError && emailCheckError.code !== "PGRST116") {
+        console.log("Email check error:", emailCheckError);
+        return res.status(400).json({
+          message: "Error checking email availability",
+          error: emailCheckError.message,
+        });
+      }
+
+      if (existingEmail) {
+        return res.status(409).json({
+          message: "Email already registered by another user",
+        });
+      }
+    }
+
+    // Check if phone already exists (excluding current user) - only if phone changed
+    if (phone !== existingUser.phone) {
+      const { data: existingPhone, error: phoneCheckError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("phone", phone)
+        .neq("id", userId)
+        .single();
+
+      if (phoneCheckError && phoneCheckError.code !== "PGRST116") {
+        console.log("Phone check error:", phoneCheckError);
+        return res.status(400).json({
+          message: "Error checking phone availability",
+          error: phoneCheckError.message,
+        });
+      }
+
+      if (existingPhone) {
+        return res.status(409).json({
+          message: "Phone number already registered by another user",
+        });
+      }
+    }
+
+    // Update data object
+    const updateData = {
+      first_name: first_name,
+      last_name: last_name,
+      email: email,
+      phone: phone,
+      address: address,
+      region: region,
+      province: province,
+      city: city,
+      barangay: barangay,
+      dob: dob,
+      gender: gender,
+      updated_at: new Date().toISOString(),
+    };
+
+    console.log("Update data:", updateData);
+
+    // DIRECT UPDATE WITH SELECT - MAS RELIABLE
+    const { data: updatedUser, error: updateError } = await supabase
+      .from("users")
+      .update(updateData)
+      .eq("id", userId)
+      .select() // Direct select after update
+      .single(); // Get single record
+
+    if (updateError) {
+      console.log("Database update error:", updateError);
+      return res.status(400).json({
+        message: "Failed to update user in database",
+        error: updateError.message,
+      });
+    }
+
+    if (!updatedUser) {
+      console.log("No user data returned after update");
+      return res.status(404).json({
+        message: "User not found after update",
+      });
+    }
+
+    console.log("Updated user returned directly:", updatedUser);
+
+    // Update auth user (optional - can run in background)
+    try {
+      const authUpdate = await supabase.auth.admin.updateUserById(userId, {
+        email: email,
+        user_metadata: {
+          first_name,
+          last_name,
+          email,
+          phone,
+          region,
+          province,
+          city,
+          barangay,
+          dob,
+          gender,
+        },
+      });
+
+      if (authUpdate.error) {
+        console.log("Auth update warning:", authUpdate.error);
+        // Don't fail the request if auth update fails, just log it
+      } else {
+        console.log("Auth user updated successfully");
+      }
+    } catch (authError) {
+      console.log("Auth update error (non-critical):", authError);
+    }
+
     return res.status(200).json({
       message: "Profile updated successfully",
-      user: dbData[0],
+      user: updatedUser,
     });
   } catch (err) {
     console.log("Unexpected error:", err);

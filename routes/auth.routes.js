@@ -4,6 +4,7 @@ import {
   forgotPassword,
   resetPassword,
   verifyUser,
+  refreshSession,
 } from "../controllers/auth.controller.js";
 import express from "express";
 
@@ -17,6 +18,9 @@ router.post("/user-registration", userRegister);
 
 // User login
 router.post("/user-login", userLogin);
+
+// Refresh session
+router.post("/refresh-session", refreshSession);
 
 // Forget Password
 router.post("/forgot-password", forgotPassword);

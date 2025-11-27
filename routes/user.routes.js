@@ -22,6 +22,6 @@ router.get("/total-active-users", getActiveUsers);
 router.get("/total-inactive-users", getInactiveUsers);
 
 // Update user profile
-router.put("/profileUpdate/:userId", updateUserProfile);
+router.put("/profile-update/:userId", updateUserProfile);
 
 export default router;
