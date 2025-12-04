@@ -287,11 +287,6 @@ export const updateCategory = async (req, res) => {
     const { category_id } = req.params;
     const { name, description, parent_category_id } = req.body;
 
-    console.log("🔄 UPDATE CATEGORY REQUEST:");
-    console.log("category_id:", category_id);
-    console.log("parent_category_id:", parent_category_id);
-    console.log("typeof parent_category_id:", typeof parent_category_id);
-
     if (!category_id) {
       return res.status(400).json({
         success: false,
@@ -304,8 +299,7 @@ export const updateCategory = async (req, res) => {
       .from("categories")
       .select("*")
       .eq("id", category_id)
-      .is("archived_at", null)
-      .single();
+      .is("archived_at", null);
 
     if (fetchError || !existingCategory) {
       return res.status(404).json({

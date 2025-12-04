@@ -5,7 +5,7 @@ import {
 } from "../configs/nodemailer.config.js";
 import jwt from "jsonwebtoken";
 
-// Get suppliers for admin
+// Get Suppliers for admin
 export const getSuppliers = async (req, res) => {
   try {
     const { data: suppliers, error } = await supabase
@@ -29,12 +29,14 @@ export const getSuppliers = async (req, res) => {
     if (error) throw error;
 
     return res.status(200).json({
+      success: true,
       message: "Suppliers retrieved successfully",
-      data: suppliers,
+      data: suppliers || [],
     });
   } catch (err) {
     console.error("Get suppliers error:", err.message);
     return res.status(500).json({
+      success: false,
       message: "Server Error",
       error: err.message,
     });
@@ -239,6 +241,119 @@ export const archiveSupplier = async (req, res) => {
   } catch (err) {
     console.error("Archive supplier error:", err.message);
     return res.status(500).json({
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};
+
+// Get suppliers for dropdown (for product form)
+export const getSuppliersForDropdown = async (req, res) => {
+  try {
+    const { data: suppliers, error } = await supabase
+      .from("suppliers")
+      .select("id, name, contact_person, phone, email")
+      .eq("status", "active")
+      .order("name");
+
+    if (error) throw error;
+
+    return res.status(200).json({
+      success: true,
+      data: suppliers || [],
+    });
+  } catch (err) {
+    console.error("Get suppliers for dropdown error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};
+
+// Get supplier by ID
+export const getSupplierById = async (req, res) => {
+  try {
+    const { supplierId } = req.params;
+
+    if (!supplierId) {
+      return res.status(400).json({
+        success: false,
+        message: "Supplier ID is required",
+      });
+    }
+
+    const { data: supplier, error } = await supabase
+      .from("suppliers")
+      .select(
+        `
+        *,
+        user:users (
+          first_name,
+          last_name,
+          email,
+          phone,
+          status
+        )
+      `
+      )
+      .eq("id", supplierId)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return res.status(404).json({
+          success: false,
+          message: "Supplier not found",
+        });
+      }
+      throw error;
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: supplier,
+    });
+  } catch (err) {
+    console.error("Get supplier by ID error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};
+
+// Get supplier by owner id(via user_id)
+export const getSupplierByOwnerId = async (req, res) => {
+  try {
+    const { owner_id } = req.params;
+
+    if (!owner_id) {
+      return res
+        .status(400)
+        .json({ message: "Owner ID is required", success: false });
+    }
+
+    const { data: supplier, error: error } = await supabase
+      .from("suppliers")
+      .select("*")
+      .eq("user_id", owner_id)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!supplier) {
+      return res
+        .status(404)
+        .json({ message: "Supplier not found for this owner" });
+    }
+    return res.status(200).json({ success: true, data: supplier });
+  } catch (err) {
+    console.error("Get supplier by owner id error:", err.message);
+    return res.status(500).json({
+      success: false,
       message: "Server Error",
       error: err.message,
     });

@@ -15,6 +15,8 @@ import categoryRoutes from "./routes/category.routes.js";
 import supplierRoutes from "./routes/supplier.routes.js";
 import eventRoutes from "./routes/events.routes.js";
 import articleRoutes from "./routes/article.routes.js";
+import productRoutes from "./routes/product.routes.js";
+import supplierProductRoutes from "./routes/supplierProducts.route.js";
 
 dotenv.config();
 const app = express();
@@ -34,6 +36,8 @@ app.use(API_BASE + "/categories", categoryRoutes);
 app.use(API_BASE + "/suppliers", supplierRoutes);
 app.use(API_BASE + "/events", eventRoutes);
 app.use(API_BASE + "/articles", articleRoutes);
+app.use(API_BASE + "/products", productRoutes);
+app.use(API_BASE + "/supplier-products", supplierProductRoutes);
 
 app.post(
   API_BASE + "/upload/single",
