@@ -52,28 +52,48 @@ export const getContacts = async (req, res) => {
   }
 };
 
-// Create contact
 export const createContact = async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, subject, message } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      subject,
+      custom_subject,
+      message,
+    } = req.body;
 
-    if (!firstName || !lastName || !email || !phone || !subject || !message) {
-      return res.status(400).json({ message: "Please fill up all the fields" });
-    }
+    const contactData = {
+      firstName,
+      lastName,
+      email,
+      phone,
+      message,
+      subject, // Will be "General Inquiry", "Order Inquiry", or "Other"
+      custom_subject, // Will be null for predefined, custom text for "Other"
+    };
 
-    const { data, error } = await supabase
+    const { data: newContact, error } = await supabase
       .from("contacts")
-      .insert([{ firstName, lastName, email, phone, subject, message }])
+      .insert(contactData)
       .select();
 
     if (error) throw error;
 
+    if (global.io) {
+      global.io.emit("new-contact-notification", {
+        contact: newContact,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     return res.status(201).json({
       message: "Contact created successfully",
-      data: data[0],
+      data: newContact[0],
     });
   } catch (err) {
-    console.error("Create contact error:", err.message);
+    console.log(err);
     return res.status(500).json({
       message: "Server Error",
       error: err.message,
@@ -93,7 +113,7 @@ export const updateContact = async (req, res) => {
 
     const { data, error } = await supabase
       .from("contacts")
-      .update({ status })
+      .update({ status, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select();
 

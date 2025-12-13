@@ -8,7 +8,7 @@ import {
   getTotalCount,
   updateCooperative,
 } from "../controllers/cooperative.controller.js";
-
+import { authenticateToken } from "../middleware/auth.js";
 const router = express.Router();
 
 // Get total count of cooperatives
@@ -21,7 +21,7 @@ router.get("/get-coop/:coopId", getSingleCoop);
 router.get("/get-coop-based-owner/:userId/", getCoopBasedOnOwner);
 
 // Get all cooperatives for admin
-router.get("/", getCooperatives);
+router.get("/", authenticateToken, getCooperatives);
 
 // Register cooperative
 router.post("/", createCooperative);

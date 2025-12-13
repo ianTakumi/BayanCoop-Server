@@ -4,7 +4,9 @@ import {
   forgotPassword,
   resetPassword,
   verifyUser,
+  verifyResetToken,
   refreshSession,
+  updatePassword,
 } from "../controllers/auth.controller.js";
 import express from "express";
 
@@ -25,7 +27,13 @@ router.post("/refresh-session", refreshSession);
 // Forget Password
 router.post("/forgot-password", forgotPassword);
 
+// Verify reset token
+router.post("/verify-reset-token", verifyResetToken);
+
 // reset  password
-router.post("/reset-password", resetPassword);
+router.put("/reset-password", resetPassword);
+
+// Update Password
+router.put("/update-password", updatePassword);
 
 export default router;

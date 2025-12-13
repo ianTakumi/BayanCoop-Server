@@ -7,6 +7,28 @@ import { validationResult } from "express-validator";
  */
 const supplierProductsController = {
   /**
+   * Get all products
+   * GET /api/v1/supplier-products/
+   */
+  getAllProducts: async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from("supplier_products")
+        .select("*");
+
+      if (error) throw error;
+
+      res.status(200).json({
+        message: "Successfully fetch the products",
+        success: true,
+        data: data,
+      });
+    } catch (err) {
+      console.log("Failed to fetch all products of suppliers");
+      res.status(500).json({ message: "Something went wrong", success: false });
+    }
+  },
+  /**
    * Get all products for a specific supplier
    * GET /api/supplier-products/supplier/:supplierId
    */
@@ -1252,7 +1274,7 @@ const supplierProductsController = {
       // Fetch categories from categories table
       const { data: categories, error } = await supabase
         .from("categories")
-        .select("id, name, parent_id, is_archived")
+        .select("id, name, parent_category_id, is_archived")
         .eq("is_archived", false)
         .order("name", { ascending: true });
 

@@ -13,7 +13,7 @@ import { authenticateToken } from "../middleware/auth.js";
 const router = express.Router();
 
 // GET Routes
-router.get("/admin", authenticateToken, getAllCategoriesForAdmin);
+router.get("/", authenticateToken, getAllCategoriesForAdmin);
 router.get("/dropdown", getCategoriesForDropdown);
 router.get("/:category_id", getCategoryById);
 

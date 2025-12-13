@@ -16,7 +16,7 @@ router.get("/dropdown", getSuppliersForDropdown); // GET /api/suppliers/dropdown
 router.get("/:owner_id", getSupplierByOwnerId);
 
 // Admin
-router.get("/admin", getSuppliers);
+router.get("/", getSuppliers);
 router.get("/admin/:supplierId", getSupplierById);
 
 // Create supplier

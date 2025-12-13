@@ -37,6 +37,13 @@ const validatePrice = [
 router.use(authenticateToken);
 
 /**
+ *  @route GET /api/v1/supplier-products
+ * @desc Get all products of a supplier
+ * @access Anyone
+ */
+router.get("/", supplierProductsController.getAllProducts);
+
+/**
  * @route   GET /api/supplier-products/supplier/:supplierId
  * @desc    Get all products for a supplier
  * @access  Private (Supplier)
