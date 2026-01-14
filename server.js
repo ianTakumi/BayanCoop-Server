@@ -5,7 +5,10 @@ import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import upload from "./configs/multer.middleware.js";
-import { uploadImageToSupabase } from "./utils/helpers.js";
+import {
+  uploadImageToSupabase,
+  deleteImageFromSupabase,
+} from "./utils/helpers.js";
 
 // Import routes
 import authRoutes from "./routes/auth.routes.js";
@@ -19,6 +22,8 @@ import articleRoutes from "./routes/article.routes.js";
 import productRoutes from "./routes/product.routes.js";
 import supplierProductRoutes from "./routes/supplierProducts.route.js";
 import communityRoutes from "./routes/community.routes.js";
+import attributeRoutes from "./routes/attribute.routes.js";
+import courierRoutes from "./routes/courier.routes.js";
 
 dotenv.config();
 const app = express();
@@ -56,6 +61,8 @@ app.use(API_BASE + "/articles", articleRoutes);
 app.use(API_BASE + "/products", productRoutes);
 app.use(API_BASE + "/supplier-products", supplierProductRoutes);
 app.use(API_BASE + "/communities", communityRoutes);
+app.use(API_BASE + "/attributes", attributeRoutes);
+app.use(API_BASE + "/couriers", courierRoutes);
 
 app.post(
   API_BASE + "/upload/single",
@@ -131,6 +138,111 @@ app.post(
     }
   }
 );
+
+// Delete single image route
+app.delete(API_BASE + "/upload/single", async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+
+    if (!imageUrl) {
+      return res.status(400).json({
+        success: false,
+        error: "Image URL is required",
+      });
+    }
+
+    // Validate the URL format
+    if (!imageUrl.includes("supabase.co/storage/v1/object/public/")) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid Supabase storage URL",
+      });
+    }
+
+    const deleted = await deleteImageFromSupabase(imageUrl);
+
+    if (!deleted) {
+      return res.status(500).json({
+        success: false,
+        error: "Failed to delete image",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Image deleted successfully",
+      data: {
+        deletedUrl: imageUrl,
+      },
+    });
+  } catch (error) {
+    console.error("Delete error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal server error",
+    });
+  }
+});
+
+// Bulk delete images route
+app.post(API_BASE + "/upload/bulk-delete", async (req, res) => {
+  try {
+    const { imageUrls } = req.body;
+
+    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Image URLs array is required",
+      });
+    }
+
+    // Validate all URLs
+    const invalidUrls = imageUrls.filter(
+      (url) => !url.includes("supabase.co/storage/v1/object/public/")
+    );
+
+    if (invalidUrls.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid Supabase storage URLs found: ${invalidUrls.length} URLs`,
+        invalidUrls: invalidUrls,
+      });
+    }
+
+    const deletionPromises = imageUrls.map((url) =>
+      deleteImageFromSupabase(url).catch((error) => {
+        console.error(`Failed to delete image ${url}:`, error);
+        return { url, success: false, error: error.message };
+      })
+    );
+
+    const results = await Promise.all(deletionPromises);
+
+    const successfulDeletions = results.filter(
+      (r) => r === true || (r && r.success === true)
+    );
+    const failedDeletions = results.filter(
+      (r) => r !== true && (!r || r.success === false)
+    );
+
+    res.json({
+      success: true,
+      message: `Deleted ${successfulDeletions.length} of ${imageUrls.length} images`,
+      data: {
+        total: imageUrls.length,
+        successful: successfulDeletions.length,
+        failed: failedDeletions.length,
+        failedDetails: failedDeletions,
+      },
+    });
+  } catch (error) {
+    console.error("Bulk delete error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal server error",
+    });
+  }
+});
 
 // Start server
 const PORT = process.env.PORT || 5000;

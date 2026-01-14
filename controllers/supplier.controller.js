@@ -236,6 +236,45 @@ export const updateSupplier = async (req, res) => {
   }
 };
 
+export const updateSupplierStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const { supplierId } = req.params;
+
+    if (!status || !supplierId) {
+      return res
+        .status(400)
+        .json({ message: "All fields are required and the supplier id" });
+    }
+
+    const { data, error } = await supabase
+      .from("suppliers")
+      .update({ status })
+      .eq("id", supplierId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating supplier status:", error.message);
+      return res.status(500).json({
+        message: "Error updating supplier status",
+        error: error.message,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Supplier status updated successfully",
+      data,
+    });
+  } catch (err) {
+    console.error("Update supplier status error:", err.message);
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};
+
 export const archiveSupplier = async (req, res) => {
   try {
   } catch (err) {

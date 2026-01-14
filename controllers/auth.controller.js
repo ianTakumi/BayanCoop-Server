@@ -636,6 +636,8 @@ export const updatePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword, confirmPassword } = req.body;
     const { user_id } = req.params;
+    console.log(req.body);
+    console.log(req.params);
 
     if (!currentPassword || !newPassword || !confirmPassword || !user_id) {
       return res

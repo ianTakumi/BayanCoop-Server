@@ -4,6 +4,8 @@ import {
   getSupplierByOwnerId,
   getSuppliers,
   getSuppliersForDropdown,
+  updateSupplier,
+  updateSupplierStatus,
 } from "../controllers/supplier.controller.js";
 import express from "express";
 
@@ -21,5 +23,11 @@ router.get("/admin/:supplierId", getSupplierById);
 
 // Create supplier
 router.post("/", createSupplier);
+
+// Update supplier
+router.put("/:supplierId", updateSupplier);
+
+// Update supplier status
+router.put("/status/:supplierId", updateSupplierStatus);
 
 export default router;

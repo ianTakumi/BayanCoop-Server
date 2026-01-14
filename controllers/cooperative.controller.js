@@ -138,7 +138,7 @@ export const createCooperative = async (req, res) => {
       userId,
       postalCode,
     } = req.body;
-
+    console.log("Request body:", req.body);
     if (
       !coopName ||
       !email ||
@@ -197,29 +197,29 @@ export const createCooperative = async (req, res) => {
 export const updateCooperative = async (req, res) => {
   try {
     const {
-      coopName,
+      name,
       email,
       phone,
-      regionName,
-      provinceName,
-      cityName,
-      barangayName,
+      region,
+      province,
+      city,
+      barangay,
       postalCode,
       address,
       completeAddress,
       latitude,
       longitude,
     } = req.body;
-    const coopId = req.params;
-
+    const { coopId } = req.params;
+    console.log("Update request body:", req.body, coopId);
     if (
-      !coopName ||
+      !name ||
       !email ||
       !phone ||
-      !regionName ||
-      !provinceName ||
-      !cityName ||
-      !barangayName ||
+      !region ||
+      !province ||
+      !city ||
+      !barangay ||
       !postalCode ||
       !address ||
       !completeAddress ||
@@ -236,13 +236,13 @@ export const updateCooperative = async (req, res) => {
     const { data, error } = await supabase
       .from("cooperatives")
       .update({
-        name: coopName,
+        name,
         email,
         phone,
-        province: provinceName,
-        region: regionName,
-        city: cityName,
-        barangay: barangayName,
+        province,
+        region,
+        city,
+        barangay,
         postalCode,
         address,
         completeAddress,

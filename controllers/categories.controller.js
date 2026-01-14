@@ -287,6 +287,9 @@ export const updateCategory = async (req, res) => {
     const { category_id } = req.params;
     const { name, description, parent_category_id } = req.body;
 
+    console.log("📝 Update request for category_id:", category_id);
+    console.log("📝 Request body:", req.body);
+
     if (!category_id) {
       return res.status(400).json({
         success: false,
@@ -294,17 +297,36 @@ export const updateCategory = async (req, res) => {
       });
     }
 
-    // Check if category exists and is not archived
+    // FIRST: Check if the category exists at all (even archived)
     const { data: existingCategory, error: fetchError } = await supabase
       .from("categories")
-      .select("*")
+      .select("id, name, archived_at")
       .eq("id", category_id)
-      .is("archived_at", null);
+      .maybeSingle();
 
-    if (fetchError || !existingCategory) {
+    console.log("🔍 Category check result:", { existingCategory, fetchError });
+
+    if (fetchError) {
+      console.log("❌ Fetch error:", fetchError);
+      return res.status(500).json({
+        success: false,
+        message: "Database error checking category",
+        error: fetchError.message,
+      });
+    }
+
+    if (!existingCategory) {
       return res.status(404).json({
         success: false,
-        message: "Category not found or is archived",
+        message: "Category not found",
+      });
+    }
+
+    // Check if archived
+    if (existingCategory.archived_at) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot update an archived category",
       });
     }
 
@@ -313,36 +335,110 @@ export const updateCategory = async (req, res) => {
       updated_at: new Date().toISOString(),
     };
 
-    if (name !== undefined) updateData.name = name;
-    if (description !== undefined) updateData.desc = description;
+    if (name !== undefined && name.trim() !== "") {
+      updateData.name = name.trim();
+    }
 
-    // FIX: Add parent_category_id handling back
+    if (description !== undefined) {
+      // IMPORTANT: Check if client is sending empty description
+      if (description.trim() === "") {
+        return res.status(400).json({
+          success: false,
+          message: "Description cannot be empty",
+        });
+      }
+      updateData.desc = description.trim(); // Column name is 'desc'
+    }
+
+    // Handle parent_category_id
     if (parent_category_id !== undefined) {
-      // Handle different null cases like in createCategory
       if (
         parent_category_id === null ||
         parent_category_id === "null" ||
-        parent_category_id === ""
+        parent_category_id === "" ||
+        parent_category_id === "0"
       ) {
         updateData.parent_category_id = null;
       } else {
+        // Validate that parent category exists
+        const { data: parentCategory } = await supabase
+          .from("categories")
+          .select("id")
+          .eq("id", parent_category_id)
+          .is("archived_at", null)
+          .single();
+
+        if (!parentCategory) {
+          return res.status(400).json({
+            success: false,
+            message: "Parent category not found or is archived",
+          });
+        }
+
+        // Prevent circular reference (category cannot be its own parent)
+        if (parent_category_id === category_id) {
+          return res.status(400).json({
+            success: false,
+            message: "Category cannot be its own parent",
+          });
+        }
+
         updateData.parent_category_id = parent_category_id;
       }
     }
 
-    console.log("📝 Final update data:", updateData);
+    console.log("📝 Final update data to send:", updateData);
 
-    const { data: updatedCategory, error: updateError } = await supabase
+    // PERFORM THE UPDATE WITHOUT .single() FIRST
+    const { error: updateError } = await supabase
       .from("categories")
       .update(updateData)
-      .eq("id", category_id)
-      .select()
-      .single();
+      .eq("id", category_id);
 
     if (updateError) {
-      console.log("❌ Supabase update error:", updateError);
-      throw updateError;
+      console.log("❌ Update error:", updateError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update category",
+        error: updateError.message,
+      });
     }
+
+    // THEN FETCH THE UPDATED CATEGORY
+    const { data: updatedCategory, error: fetchUpdatedError } = await supabase
+      .from("categories")
+      .select("*")
+      .eq("id", category_id)
+      .single();
+
+    if (fetchUpdatedError) {
+      console.log("❌ Fetch updated error:", fetchUpdatedError);
+
+      // Even if fetch failed, the update might still be successful
+      // Try one more time with maybeSingle
+      const { data: retryData } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("id", category_id)
+        .maybeSingle();
+
+      if (retryData) {
+        return res.json({
+          success: true,
+          message: "Category updated successfully",
+          data: retryData,
+        });
+      }
+
+      // If we still can't fetch, at least confirm the update worked
+      return res.json({
+        success: true,
+        message: "Category updated successfully",
+        warning: "Could not fetch updated data immediately",
+      });
+    }
+
+    console.log("✅ Category updated successfully:", updatedCategory);
 
     return res.json({
       success: true,
@@ -350,7 +446,7 @@ export const updateCategory = async (req, res) => {
       data: updatedCategory,
     });
   } catch (err) {
-    console.log("❌ Cannot update category", err);
+    console.log("❌ Cannot update category:", err);
     return res.status(500).json({
       success: false,
       message: "Server Error",

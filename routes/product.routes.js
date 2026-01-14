@@ -1,45 +1,61 @@
 import express from "express";
 import {
-  getAllProducts,
+  getAllProductsBasedOnCoopId,
   getProductById,
   createProduct,
   updateProduct,
-  updateInventory,
   archiveProduct,
-  restoreProduct,
-  getPriceHistory,
-  getLowStockProducts,
-} from "../controllers/product.controller.js";
+  getProductAttributes,
+  createAttribute,
+  updateAttribute,
+  updateAttributeStock,
+  bulkUpdateStock,
+  unarchiveProduct,
+  getAllProducts,
+} from "../controllers/products.controller.js";
 
 const router = express.Router();
 
-// All routes are prefixed with: /api/cooperatives/:coopId/products
+// ============ PRODUCTS ROUTES ============
 
-// Get all products for a coop
-router.get("/:coopId/products", getAllProducts);
+// Get all products for user
+router.get("/", getAllProducts);
 
-// Get single product
-router.get("/:coopId/products/:productId", getProductById);
+// Get all products for a cooperative (coop_id = cooperatives.id)
+router.get("/:coopId", getAllProductsBasedOnCoopId);
 
-// Create new product
-router.post("/:coopId/products", createProduct);
+// Get single product by product ID
+router.get("/single/:id", getProductById);
 
-// Update product
-router.put("/:coopId/products/:productId", updateProduct);
+// Create new product for a cooperative
+router.post("/:coopId", createProduct);
 
-// Update product inventory
-router.patch("/:coopId/products/:productId/inventory", updateInventory);
+// Update product by product ID
+router.put("/:id", updateProduct);
 
-// Archive product (soft delete)
-router.delete("/:coopId/products/:productId/archive", archiveProduct);
+// Archive product
+router.put("/archive/:id", archiveProduct);
 
-// Restore archived product
-router.patch("/:coopId/products/:productId/restore", restoreProduct);
+// Unarchive product
+router.put("/unarchive/:id", unarchiveProduct);
 
-// Get product price history
-router.get("/:coopId/products/:productId/price-history", getPriceHistory);
+// ============ PRODUCT ATTRIBUTES ROUTES ============
 
-// Get low stock products
-router.get("/:coopId/products/low-stock", getLowStockProducts);
+// Get all attributes for a product
+router.get("/:productId/attributes", getProductAttributes);
+
+// Create new attribute for a product
+router.post("/:productId/attributes", createAttribute);
+
+// Update product attribute
+router.put("/attributes/:attributeId", updateAttribute);
+
+// Update product attribute stock
+router.patch("/attributes/:attributeId/stock", updateAttributeStock);
+
+// ============ BULK OPERATIONS ============
+
+// Bulk update stock for a cooperative
+router.post("/cooperative/:coopId/inventory/bulk-update", bulkUpdateStock);
 
 export default router;

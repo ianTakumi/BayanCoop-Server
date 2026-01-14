@@ -34,6 +34,6 @@ router.post("/verify-reset-token", verifyResetToken);
 router.put("/reset-password", resetPassword);
 
 // Update Password
-router.put("/update-password", updatePassword);
+router.put("/update-password/:user_id", updatePassword);
 
 export default router;

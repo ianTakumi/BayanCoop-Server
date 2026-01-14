@@ -1,22 +1,31 @@
 import express from "express";
-import { createCourier } from "../controllers/courier.controller";
-import upload from "../configs/multer.middleware";
+import {
+  archiveCourier,
+  createCourier,
+  getCouriers,
+  getSingleCourierBasedOnId,
+  unArchiveCourier,
+  updateCourier,
+} from "../controllers/courier.controller.js";
 
 const router = express.Router();
 
-// Create courier
-router.post(
-  "/:coopId",
-  upload.fields([
-    { name: "profileImage", maxCount: 1 },
-    { name: "licenseFront", maxCount: 1 },
-    { name: "licenseBack", maxCount: 1 },
-  ]),
-  createCourier
-);
+// Get all couriers
+router.get("/", getCouriers);
 
-// Update courier details
-// router.post("/update-profile-details",);
-// Update courier profile picture
+// Get single courier
+router.get("/:courierId", getSingleCourierBasedOnId);
+
+// Create courier
+router.post("/", createCourier);
+
+// Archive courier
+router.put("/:courierId/archive", archiveCourier);
+
+// Restore courier
+router.put("/:courierId/restore", unArchiveCourier);
+
+// Update courier profile
+router.put("/:courierId", updateCourier);
 
 export default router;

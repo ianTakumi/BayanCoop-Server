@@ -228,8 +228,6 @@ export const createArticle = async (req, res) => {
       featured_image_url,
       category,
       status = "draft",
-      meta_title,
-      meta_description,
       tags = [],
     } = req.body;
 
@@ -283,9 +281,6 @@ export const createArticle = async (req, res) => {
           featured_image_url,
           category: category || null,
           status,
-          meta_title: meta_title || title,
-          meta_description:
-            meta_description || excerpt?.substring(0, 160) || "",
           read_time,
           tags: formattedTags,
           published_at:
@@ -334,8 +329,6 @@ export const updateArticle = async (req, res) => {
       featured_image_url,
       category,
       status,
-      meta_title,
-      meta_description,
       tags,
     } = req.body;
 
@@ -395,8 +388,6 @@ export const updateArticle = async (req, res) => {
       ...(featured_image_url !== undefined && { featured_image_url }),
       ...(category !== undefined && { category: category || null }),
       ...(status && { status }),
-      ...(meta_title !== undefined && { meta_title }),
-      ...(meta_description !== undefined && { meta_description }),
       read_time,
       updated_at: new Date().toISOString(),
     };

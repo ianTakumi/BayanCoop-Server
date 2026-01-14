@@ -242,6 +242,7 @@ export const updateUserProfile = async (req, res) => {
       !dob ||
       !gender
     ) {
+      console.log("Validation failed: Missing fields");
       return res.status(400).json({ message: "All fields are required" });
     }
 
