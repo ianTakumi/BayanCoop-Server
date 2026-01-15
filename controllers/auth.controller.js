@@ -58,6 +58,10 @@ export const userRegister = async (req, res) => {
       return res.status(400).json({ error: insertError.message });
     }
 
+    const { data, error } = await supabase
+      .from("carts")
+      .insert([{ user_id: userId }]);
+
     // Generate JWT verification token
     const verificationToken = jwt.sign(
       {

@@ -4,6 +4,7 @@ import {
   getActiveUsers,
   getInactiveUsers,
   updateUserProfile,
+  updateUserAddress,
 } from "../controllers/user.controller.js";
 import express from "express";
 
@@ -23,5 +24,8 @@ router.get("/total-inactive-users", getInactiveUsers);
 
 // Update user profile
 router.put("/profile-update/:userId", updateUserProfile);
+
+// Update user address
+router.put("/address-update/:userId", updateUserAddress);
 
 export default router;

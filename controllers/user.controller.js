@@ -403,3 +403,44 @@ export const updateUserProfile = async (req, res) => {
     });
   }
 };
+
+// Update user address
+export const updateUserAddress = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { address, region, province, city, barangay } = req.body;
+    console.log(req.body);
+    if (!address || !region || !province || !city || !barangay) {
+      return res
+        .status(400)
+        .json({ message: "All address fields are required" });
+    }
+
+    const { data: updatedUser, error: updateError } = await supabase
+      .from("users")
+      .update({
+        address,
+        region,
+        province,
+        city,
+        barangay,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    return res.status(200).json({
+      message: "Address updated successfully",
+      user: updatedUser,
+    });
+  } catch (err) {
+    console.log("Unexpected error:", err);
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message,
+    });
+  }
+};

@@ -24,6 +24,8 @@ import supplierProductRoutes from "./routes/supplierProducts.route.js";
 import communityRoutes from "./routes/community.routes.js";
 import attributeRoutes from "./routes/attribute.routes.js";
 import courierRoutes from "./routes/courier.routes.js";
+import cartRoutes from "./routes/cart.routes.js";
+import orderRoutes from "./routes/order.routes.js";
 
 dotenv.config();
 const app = express();
@@ -63,7 +65,10 @@ app.use(API_BASE + "/supplier-products", supplierProductRoutes);
 app.use(API_BASE + "/communities", communityRoutes);
 app.use(API_BASE + "/attributes", attributeRoutes);
 app.use(API_BASE + "/couriers", courierRoutes);
+app.use(API_BASE + "/carts", cartRoutes);
+app.use(API_BASE + "/orders", orderRoutes);
 
+// Image upload routes
 app.post(
   API_BASE + "/upload/single",
   upload.single("image"),
