@@ -1,5 +1,7 @@
 import { supabase } from "../utils/supabase_client.js";
+import axios from "axios";
 
+// Utility function to generate a unique order number
 const generateOrderNumber = async () => {
   const date = new Date();
   const datePrefix = date.toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
@@ -18,12 +20,6 @@ const generateOrderNumber = async () => {
   const sequenceStr = sequence.toString().padStart(5, "0");
 
   return `ORD-${datePrefix}-${sequenceStr}`;
-};
-
-// Or for simple timestamp-based approach:
-const generateTimestampOrderNumber = () => {
-  const timestamp = Date.now().toString().slice(-8);
-  return `ORD${timestamp}`;
 };
 
 // Get all orders based on user(Customer) ID
@@ -94,26 +90,69 @@ export const getOrdersByCoop = async (req, res) => {
     const limitInt = parseInt(limit);
     const startIndex = (pageInt - 1) * limitInt;
 
-    // Build the base query
+    // Step 1: First get order items filtered by cooperative
+    const { data: coopOrderItems, error: itemsError } = await supabase
+      .from("order_items")
+      .select(
+        `
+        *,
+        order:orders(*),
+        product_attribute:products_attributes(
+          *,
+          product:products(
+            *,
+            cooperative:cooperatives(*)
+          )
+        )
+      `
+      )
+      .eq("cooperative_id", coopId) // Use the cooperative_id column directly
+      .order("created_at", { ascending: false });
+
+    if (itemsError) {
+      console.error("Error fetching order items:", itemsError);
+      throw itemsError;
+    }
+
+    // Extract unique order IDs
+    const orderIds = [...new Set(coopOrderItems.map((item) => item.order_id))];
+
+    if (orderIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        orders: [],
+        pagination: {
+          page: pageInt,
+          limit: limitInt,
+          total: 0,
+          total_pages: 0,
+        },
+        statistics: {
+          total_orders: 0,
+          pending_orders: 0,
+          confirmed_orders: 0,
+          processing_orders: 0,
+          shipped_orders: 0,
+          delivered_orders: 0,
+          cancelled_orders: 0,
+          total_revenue: 0,
+          cod_orders: 0,
+          gcash_orders: 0,
+          total_items_sold: 0,
+        },
+      });
+    }
+
+    // Step 2: Get the actual orders with user data
     let query = supabase
       .from("orders")
       .select(
         `
         *,
-        order_items!inner(
-          *,
-          product_attribute:products_attributes(
-            *,
-            product:products(
-              *,
-              cooperative:cooperatives!inner(*)
-            )
-          )
-        ),
         user:users(*)
       `
       )
-      .eq("order_items.product_attribute.product.cooperative.id", coopId)
+      .in("id", orderIds)
       .order("created_at", { ascending: false });
 
     // Apply filters
@@ -149,162 +188,148 @@ export const getOrdersByCoop = async (req, res) => {
       head: true,
     });
 
-    if (countError) throw countError;
+    if (countError) {
+      console.error("Error getting count:", countError);
+      throw countError;
+    }
 
     // Apply pagination
     query = query.range(startIndex, startIndex + limitInt - 1);
 
     // Execute query
-    const { data: orders, error } = await query;
+    const { data: orders, error: ordersError } = await query;
 
-    if (error) throw error;
-
-    // Transform data to group by order and include cooperative items only
-    const transformedOrders = orders
-      .map((order) => {
-        // Filter order items for this cooperative only
-        const coopItems = order.order_items.filter(
-          (item) => item.product_attribute?.product?.cooperative?.id === coopId
-        );
-
-        // Calculate cooperative subtotal
-        const coopSubtotal = coopItems.reduce((sum, item) => {
-          return sum + item.quantity * item.unit_price;
-        }, 0);
-
-        return {
-          id: order.id,
-          order_number: order.order_number,
-          order_date: order.order_date,
-          order_status: order.order_status,
-          payment_method: order.payment_method,
-          payment_status: order.payment_status,
-          total_amount: order.total_amount,
-          coop_subtotal: coopSubtotal,
-          shipping_address: order.shipping_address,
-          customer: order.user
-            ? {
-                id: order.user.id,
-                first_name: order.user.first_name,
-                last_name: order.user.last_name,
-                email: order.user.email,
-                phone: order.user.phone,
-              }
-            : null,
-          items: coopItems.map((item) => ({
-            id: item.id,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            total_price: item.total_price,
-            item_status: item.item_status,
-            product: {
-              name: item.product_attribute?.product?.name,
-              attribute_value: item.product_attribute?.attribute_value,
-              sku: item.product_attribute?.sku,
-              image: item.product_attribute?.product?.images?.[0] || null,
-            },
-          })),
-          created_at: order.created_at,
-          updated_at: order.updated_at,
-        };
-      })
-      .filter((order) => order.items.length > 0); // Only include orders with items from this cooperative
-
-    // Get additional statistics for the cooperative
-    const { data: stats, error: statsError } = await supabase
-      .from("order_items")
-      .select(
-        `
-        item_status,
-        quantity,
-        unit_price,
-        order:orders!inner(order_status),
-        product_attribute:products_attributes(
-          product:products(
-            cooperative:cooperatives!inner(id)
-          )
-        )
-      `
-      )
-      .eq("product_attribute.product.cooperative.id", coopId);
-
-    if (!statsError && stats) {
-      const statsData = {
-        total_orders: transformedOrders.length,
-        pending_orders: transformedOrders.filter(
-          (o) => o.order_status === "pending"
-        ).length,
-        confirmed_orders: transformedOrders.filter(
-          (o) => o.order_status === "confirmed"
-        ).length,
-        processing_orders: transformedOrders.filter(
-          (o) => o.order_status === "processing"
-        ).length,
-        shipped_orders: transformedOrders.filter(
-          (o) => o.order_status === "shipped"
-        ).length,
-        delivered_orders: transformedOrders.filter(
-          (o) => o.order_status === "delivered"
-        ).length,
-        cancelled_orders: transformedOrders.filter(
-          (o) => o.order_status === "cancelled"
-        ).length,
-        total_revenue: transformedOrders.reduce(
-          (sum, order) => sum + order.coop_subtotal,
-          0
-        ),
-        cod_orders: transformedOrders.filter((o) => o.payment_method === "cod")
-          .length,
-        gcash_orders: transformedOrders.filter(
-          (o) => o.payment_method === "gcash"
-        ).length,
-        total_items_sold: stats.reduce(
-          (sum, item) =>
-            sum +
-            (item.order?.order_status !== "cancelled" ? item.quantity : 0),
-          0
-        ),
-      };
-
-      res.status(200).json({
-        success: true,
-        orders: transformedOrders,
-        pagination: {
-          page: pageInt,
-          limit: limitInt,
-          total: count || 0,
-          total_pages: Math.ceil((count || 0) / limitInt),
-        },
-        filters: {
-          status,
-          start_date,
-          end_date,
-          search,
-          payment_method,
-          payment_status,
-        },
-        statistics: statsData,
-      });
-    } else {
-      res.status(200).json({
-        success: true,
-        orders: transformedOrders,
-        pagination: {
-          page: pageInt,
-          limit: limitInt,
-          total: count || 0,
-          total_pages: Math.ceil((count || 0) / limitInt),
-        },
-        filters: {
-          status,
-          start_date,
-          end_date,
-          search,
-          payment_method,
-          payment_status,
-        },
-      });
+    if (ordersError) {
+      console.error("Error fetching orders:", ordersError);
+      throw ordersError;
     }
+
+    // Step 3: Combine orders with their items from this cooperative
+    const transformedOrders = orders.map((order) => {
+      // Get items for this order from this cooperative
+      const coopItems = coopOrderItems.filter(
+        (item) => item.order_id === order.id
+      );
+
+      // Calculate cooperative subtotal
+      const coopSubtotal = coopItems.reduce((sum, item) => {
+        return sum + item.quantity * item.unit_price;
+      }, 0);
+
+      return {
+        id: order.id,
+        order_number: order.order_number,
+        order_date: order.order_date,
+        order_status: order.order_status,
+        payment_method: order.payment_method,
+        payment_status: order.payment_status,
+        payment_reference: order.payment_reference,
+        total_amount: order.total_amount,
+        coop_subtotal: coopSubtotal,
+        shipping_address: order.shipping_address,
+        shipping_status: order.shipping_status,
+        tracking_number: order.tracking_number,
+        customer_notes: order.customer_notes,
+        customer: order.user
+          ? {
+              id: order.user.id,
+              first_name: order.user.first_name,
+              last_name: order.user.last_name,
+              email: order.user.email,
+              phone: order.user.phone,
+            }
+          : null,
+        items: coopItems.map((item) => ({
+          id: item.id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+          item_status: item.item_status,
+          product: {
+            id: item.product_attribute?.product?.id,
+            name: item.product_attribute?.product?.name,
+            attribute_value: item.product_attribute?.attribute_value,
+            sku: item.product_attribute?.sku,
+            image: item.product_attribute?.product?.images?.[0] || null,
+          },
+          cooperative: {
+            id: item.product_attribute?.product?.cooperative?.id,
+            name: item.product_attribute?.product?.cooperative?.name,
+          },
+        })),
+        created_at: order.created_at,
+        updated_at: order.updated_at,
+      };
+    });
+
+    // Step 4: Calculate statistics
+    const statsData = {
+      total_orders: transformedOrders.length,
+      pending_orders: transformedOrders.filter(
+        (o) => o.order_status === "pending"
+      ).length,
+      confirmed_orders: transformedOrders.filter(
+        (o) => o.order_status === "confirmed"
+      ).length,
+      processing_orders: transformedOrders.filter(
+        (o) => o.order_status === "processing"
+      ).length,
+      shipped_orders: transformedOrders.filter(
+        (o) => o.order_status === "shipped"
+      ).length,
+      delivered_orders: transformedOrders.filter(
+        (o) => o.order_status === "delivered"
+      ).length,
+      cancelled_orders: transformedOrders.filter(
+        (o) => o.order_status === "cancelled"
+      ).length,
+      total_revenue: transformedOrders.reduce(
+        (sum, order) => sum + order.coop_subtotal,
+        0
+      ),
+      cod_orders: transformedOrders.filter((o) => o.payment_method === "cod")
+        .length,
+      gcash_orders: transformedOrders.filter(
+        (o) => o.payment_method === "gcash"
+      ).length,
+      bank_transfer_orders: transformedOrders.filter(
+        (o) => o.payment_method === "bank_transfer"
+      ).length,
+      credit_card_orders: transformedOrders.filter(
+        (o) => o.payment_method === "credit_card"
+      ).length,
+      total_items_sold: coopOrderItems.reduce(
+        (sum, item) =>
+          sum + (item.order?.order_status !== "cancelled" ? item.quantity : 0),
+        0
+      ),
+    };
+
+    // Apply pagination filtering
+    const paginatedOrders = transformedOrders.slice(
+      startIndex,
+      startIndex + limitInt
+    );
+
+    res.status(200).json({
+      success: true,
+      orders: paginatedOrders,
+      pagination: {
+        page: pageInt,
+        limit: limitInt,
+        total: transformedOrders.length,
+        total_pages: Math.ceil(transformedOrders.length / limitInt),
+      },
+      filters: {
+        status,
+        start_date,
+        end_date,
+        search,
+        payment_method,
+        payment_status,
+      },
+      statistics: statsData,
+    });
   } catch (err) {
     console.error("Error fetching orders by coop:", err);
     res.status(500).json({

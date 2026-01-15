@@ -37,6 +37,28 @@ CREATE TABLE public.attributes (
   CONSTRAINT attributes_pkey PRIMARY KEY (attribute_id),
   CONSTRAINT attributes_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)
 );
+CREATE TABLE public.cart_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  cart_id uuid NOT NULL,
+  product_source text NOT NULL CHECK (product_source = ANY (ARRAY['cooperative'::text, 'supplier'::text])),
+  coop_product_attribute_id uuid,
+  supplier_product_attribute_id uuid,
+  quantity integer NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  added_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT cart_items_pkey PRIMARY KEY (id),
+  CONSTRAINT cart_items_cart_id_fkey FOREIGN KEY (cart_id) REFERENCES public.carts(id),
+  CONSTRAINT cart_items_coop_product_attribute_fkey FOREIGN KEY (coop_product_attribute_id) REFERENCES public.products_attributes(id),
+  CONSTRAINT cart_items_supplier_product_attribute_fkey FOREIGN KEY (supplier_product_attribute_id) REFERENCES public.supplier_product_attributes(id)
+);
+CREATE TABLE public.carts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT carts_pkey PRIMARY KEY (id),
+  CONSTRAINT carts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.categories (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   parent_category_id uuid,
@@ -189,6 +211,62 @@ CREATE TABLE public.events (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT events_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.order_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  user_id uuid,
+  status character varying NOT NULL,
+  notes text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT order_history_pkey PRIMARY KEY (id),
+  CONSTRAINT order_history_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.order_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL,
+  product_attribute_id uuid NOT NULL,
+  quantity integer NOT NULL CHECK (quantity > 0),
+  unit_price numeric NOT NULL,
+  total_price numeric NOT NULL DEFAULT ((quantity)::numeric * unit_price),
+  cooperative_id uuid,
+  item_status character varying NOT NULL DEFAULT 'pending'::character varying CHECK (item_status::text = ANY (ARRAY['pending'::character varying, 'confirmed'::character varying, 'out_of_stock'::character varying, 'shipped'::character varying, 'delivered'::character varying, 'cancelled'::character varying]::text[])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT order_items_pkey PRIMARY KEY (id),
+  CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_items_product_attribute_id_fkey FOREIGN KEY (product_attribute_id) REFERENCES public.products_attributes(id),
+  CONSTRAINT order_items_cooperative_id_fkey FOREIGN KEY (cooperative_id) REFERENCES public.cooperatives(id)
+);
+CREATE TABLE public.orders (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  order_number character varying NOT NULL UNIQUE,
+  order_date timestamp with time zone NOT NULL DEFAULT now(),
+  order_status character varying NOT NULL DEFAULT 'pending'::character varying CHECK (order_status::text = ANY (ARRAY['pending'::character varying, 'confirmed'::character varying, 'processing'::character varying, 'shipped'::character varying, 'delivered'::character varying, 'cancelled'::character varying, 'refunded'::character varying]::text[])),
+  payment_method character varying NOT NULL DEFAULT 'cod'::character varying CHECK (payment_method::text = ANY (ARRAY['cod'::character varying, 'gcash'::character varying, 'bank_transfer'::character varying, 'credit_card'::character varying]::text[])),
+  payment_status character varying NOT NULL DEFAULT 'pending'::character varying CHECK (payment_status::text = ANY (ARRAY['pending'::character varying, 'paid'::character varying, 'failed'::character varying, 'refunded'::character varying]::text[])),
+  payment_reference character varying,
+  payment_date timestamp with time zone,
+  shipping_address jsonb NOT NULL,
+  shipping_method character varying NOT NULL DEFAULT 'standard'::character varying CHECK (shipping_method::text = ANY (ARRAY['standard'::character varying, 'express'::character varying]::text[])),
+  shipping_status character varying NOT NULL DEFAULT 'pending'::character varying CHECK (shipping_status::text = ANY (ARRAY['pending'::character varying, 'packed'::character varying, 'shipped'::character varying, 'out_for_delivery'::character varying, 'delivered'::character varying]::text[])),
+  tracking_number character varying,
+  estimated_delivery_date timestamp with time zone,
+  actual_delivery_date timestamp with time zone,
+  subtotal numeric NOT NULL DEFAULT 0.00,
+  delivery_fee numeric NOT NULL DEFAULT 50.00,
+  service_fee numeric NOT NULL DEFAULT 0.00,
+  total_amount numeric NOT NULL DEFAULT 0.00,
+  customer_notes text,
+  admin_notes text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  cancelled_at timestamp with time zone,
+  cancelled_reason text,
+  CONSTRAINT orders_pkey PRIMARY KEY (id),
+  CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.password_resets (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
