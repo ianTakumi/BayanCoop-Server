@@ -1,15 +1,6 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
-CREATE TABLE public.article_likes (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  article_id uuid NOT NULL,
-  user_id uuid NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT article_likes_pkey PRIMARY KEY (id),
-  CONSTRAINT article_likes_article_id_fkey FOREIGN KEY (article_id) REFERENCES public.articles(id),
-  CONSTRAINT article_likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
-);
 CREATE TABLE public.articles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   title character varying NOT NULL,
@@ -70,58 +61,38 @@ CREATE TABLE public.categories (
   archive_reason text,
   CONSTRAINT categories_pkey PRIMARY KEY (id)
 );
-CREATE TABLE public.comment_reactions (
+CREATE TABLE public.comment_votes (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   comment_id uuid NOT NULL,
   user_id uuid NOT NULL,
-  reaction_type USER-DEFINED DEFAULT 'like'::reaction_type,
-  created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT comment_reactions_pkey PRIMARY KEY (id),
-  CONSTRAINT comment_reactions_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES public.comments(id),
-  CONSTRAINT comment_reactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
-);
-CREATE TABLE public.comments (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  article_id uuid NOT NULL,
-  user_id uuid NOT NULL,
-  parent_id uuid,
-  content text NOT NULL,
-  is_approved boolean DEFAULT true,
-  is_admin_reply boolean DEFAULT false,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT comments_pkey PRIMARY KEY (id),
-  CONSTRAINT comments_article_id_fkey FOREIGN KEY (article_id) REFERENCES public.articles(id),
-  CONSTRAINT comments_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-  CONSTRAINT comments_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.comments(id)
+  vote_type text NOT NULL CHECK (vote_type = ANY (ARRAY['upvote'::text, 'downvote'::text])),
+  created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT comment_votes_pkey PRIMARY KEY (id),
+  CONSTRAINT comment_votes_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES public.post_comments(id),
+  CONSTRAINT comment_votes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.communities (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  created_by uuid DEFAULT auth.uid(),
+  created_by uuid NOT NULL,
   name text NOT NULL,
   description text NOT NULL,
-  slug text UNIQUE,
+  slug text NOT NULL UNIQUE,
   image_url text,
   banner_url text,
   rules text,
-  privacy text DEFAULT 'public'::text CHECK (privacy = ANY (ARRAY['public'::text, 'private'::text])),
-  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'active'::text, 'inactive'::text, 'archived'::text])),
-  is_approved boolean DEFAULT false,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'active'::text, 'inactive'::text, 'archived'::text])),
+  is_approved boolean NOT NULL DEFAULT false,
   approved_by uuid,
   approved_at timestamp without time zone,
-  total_members integer DEFAULT 0,
-  male_count integer DEFAULT 0,
-  female_count integer DEFAULT 0,
-  post_count integer DEFAULT 0,
-  comment_count integer DEFAULT 0,
-  tags ARRAY DEFAULT '{}'::text[],
   created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
   archived_at timestamp without time zone,
   archive_reason text,
+  tags text NOT NULL,
   CONSTRAINT communities_pkey PRIMARY KEY (id),
-  CONSTRAINT communities_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
-  CONSTRAINT communities_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES auth.users(id)
+  CONSTRAINT communities_created_by_fkey1 FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT communities_approved_by_fkey1 FOREIGN KEY (approved_by) REFERENCES public.users(id)
 );
 CREATE TABLE public.community_members (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -134,8 +105,8 @@ CREATE TABLE public.community_members (
   updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
   joined_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT community_members_pkey PRIMARY KEY (id),
-  CONSTRAINT community_members_community_id_fkey FOREIGN KEY (community_id) REFERENCES public.communities(id),
-  CONSTRAINT community_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+  CONSTRAINT community_members_user_id_fkey1 FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT community_members_community_id_fkey FOREIGN KEY (community_id) REFERENCES public.communities(id)
 );
 CREATE TABLE public.contacts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -176,19 +147,18 @@ CREATE TABLE public.cooperatives (
 );
 CREATE TABLE public.courier (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  license_front text NOT NULL,
-  license_back text NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp without time zone NOT NULL,
   archived_at timestamp without time zone,
   vehicle_type text NOT NULL,
-  or_url text NOT NULL,
-  cr_url text NOT NULL,
   archived_reason text,
   user_id uuid NOT NULL DEFAULT auth.uid(),
-  status text NOT NULL DEFAULT 'pending'::text,
+  status text NOT NULL DEFAULT '''active''::text'::text,
+  vehicle_model text NOT NULL,
+  cooperative_id uuid NOT NULL,
   CONSTRAINT courier_pkey PRIMARY KEY (id),
-  CONSTRAINT courier_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+  CONSTRAINT courier_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT courier_cooperative_id_fkey FOREIGN KEY (cooperative_id) REFERENCES public.cooperatives(id)
 );
 CREATE TABLE public.events (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -295,13 +265,33 @@ CREATE TABLE public.post_comments (
   updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT post_comments_pkey PRIMARY KEY (id),
   CONSTRAINT post_comments_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id),
-  CONSTRAINT post_comments_author_id_fkey FOREIGN KEY (author_id) REFERENCES auth.users(id),
-  CONSTRAINT post_comments_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.post_comments(id)
+  CONSTRAINT post_comments_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.post_comments(id),
+  CONSTRAINT post_comments_author_id_fkey1 FOREIGN KEY (author_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.post_saves (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  post_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT post_saves_pkey PRIMARY KEY (id),
+  CONSTRAINT post_saves_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id),
+  CONSTRAINT post_saves_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.post_votes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  post_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  vote_type text NOT NULL CHECK (vote_type = ANY (ARRAY['upvote'::text, 'downvote'::text])),
+  created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT post_votes_pkey PRIMARY KEY (id),
+  CONSTRAINT post_votes_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id),
+  CONSTRAINT post_votes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.posts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  community_id uuid,
-  author_id uuid,
+  community_id uuid NOT NULL,
+  author_id uuid NOT NULL,
   title text NOT NULL,
   content text,
   post_type text DEFAULT 'text'::text CHECK (post_type = ANY (ARRAY['text'::text, 'link'::text, 'image'::text, 'poll'::text, 'video'::text])),

@@ -20,13 +20,13 @@ export const getTotalUsers = async (req, res) => {
     });
   }
 };
-
-// Get all users
+// Get all users except suppliers
 export const getAllUsers = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("users")
       .select("*")
+      .neq("role", "supplier") // Exclude users with role 'supplier'
       .order("created_at", { ascending: false });
 
     if (error) throw error;
