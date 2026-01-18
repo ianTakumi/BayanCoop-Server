@@ -82,17 +82,14 @@ CREATE TABLE public.communities (
   banner_url text,
   rules text,
   status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'active'::text, 'inactive'::text, 'archived'::text])),
-  is_approved boolean NOT NULL DEFAULT false,
-  approved_by uuid,
-  approved_at timestamp without time zone,
   created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
   archived_at timestamp without time zone,
   archive_reason text,
   tags text NOT NULL,
+  category text,
   CONSTRAINT communities_pkey PRIMARY KEY (id),
-  CONSTRAINT communities_created_by_fkey1 FOREIGN KEY (created_by) REFERENCES public.users(id),
-  CONSTRAINT communities_approved_by_fkey1 FOREIGN KEY (approved_by) REFERENCES public.users(id)
+  CONSTRAINT communities_created_by_fkey1 FOREIGN KEY (created_by) REFERENCES public.users(id)
 );
 CREATE TABLE public.community_members (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

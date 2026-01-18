@@ -1,9 +1,10 @@
 import express from "express";
 import {
-  createCommunity,
+  getUserJoinedCommunities,
   getCommunities,
   getCommunityBasedOnOwnerID,
   getCommunityBasedOnSlug,
+  createCommunity,
   updateCommunity,
   updateCommunityStatus,
 } from "../controllers/community.controller.js";
@@ -15,6 +16,9 @@ router.get("/", getCommunities);
 
 // Get community based on slug
 router.get("/slug/:slug", getCommunityBasedOnSlug);
+
+// Get communities that user has joined
+router.get("/joined/:user_id", getUserJoinedCommunities);
 
 // Get community based on owner ID
 router.get("/owner/:user_id", getCommunityBasedOnOwnerID);

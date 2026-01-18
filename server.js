@@ -26,6 +26,8 @@ import attributeRoutes from "./routes/attribute.routes.js";
 import courierRoutes from "./routes/courier.routes.js";
 import cartRoutes from "./routes/cart.routes.js";
 import orderRoutes from "./routes/order.routes.js";
+import postRoutes from "./routes/post.routes.js";
+import commentRoutes from "./routes/comment.routes.js";
 
 dotenv.config();
 const app = express();
@@ -67,6 +69,8 @@ app.use(API_BASE + "/attributes", attributeRoutes);
 app.use(API_BASE + "/couriers", courierRoutes);
 app.use(API_BASE + "/carts", cartRoutes);
 app.use(API_BASE + "/orders", orderRoutes);
+app.use(API_BASE + "/posts", postRoutes);
+app.use(API_BASE + "/comments", commentRoutes);
 
 // Image upload routes
 app.post(
@@ -83,7 +87,7 @@ app.post(
 
       const publicUrl = await uploadImageToSupabase(
         req.file,
-        req.body.folder || "uploads"
+        req.body.folder || "uploads",
       );
 
       res.json({
@@ -103,7 +107,7 @@ app.post(
         error: error.message,
       });
     }
-  }
+  },
 );
 
 app.post(
@@ -119,7 +123,7 @@ app.post(
       }
 
       const uploadPromises = req.files.map((file) =>
-        uploadImageToSupabase(file, req.body.folder || "uploads")
+        uploadImageToSupabase(file, req.body.folder || "uploads"),
       );
 
       const urls = await Promise.all(uploadPromises);
@@ -141,7 +145,7 @@ app.post(
         error: error.message,
       });
     }
-  }
+  },
 );
 
 // Delete single image route
@@ -203,7 +207,7 @@ app.post(API_BASE + "/upload/bulk-delete", async (req, res) => {
 
     // Validate all URLs
     const invalidUrls = imageUrls.filter(
-      (url) => !url.includes("supabase.co/storage/v1/object/public/")
+      (url) => !url.includes("supabase.co/storage/v1/object/public/"),
     );
 
     if (invalidUrls.length > 0) {
@@ -218,16 +222,16 @@ app.post(API_BASE + "/upload/bulk-delete", async (req, res) => {
       deleteImageFromSupabase(url).catch((error) => {
         console.error(`Failed to delete image ${url}:`, error);
         return { url, success: false, error: error.message };
-      })
+      }),
     );
 
     const results = await Promise.all(deletionPromises);
 
     const successfulDeletions = results.filter(
-      (r) => r === true || (r && r.success === true)
+      (r) => r === true || (r && r.success === true),
     );
     const failedDeletions = results.filter(
-      (r) => r !== true && (!r || r.success === false)
+      (r) => r !== true && (!r || r.success === false),
     );
 
     res.json({

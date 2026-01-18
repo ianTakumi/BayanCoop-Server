@@ -188,11 +188,12 @@ export const getCommunities = async (req, res) => {
   }
 };
 
-// Get single community by slug with detailed info
+// Get single community by slug with detailed info (public access)
 export const getCommunityBasedOnSlug = async (req, res) => {
   try {
     const { slug } = req.params;
-    const user_id = req.user?.id;
+    // Optional: get user_id if authenticated, but not required
+    const user_id = req.user?.id || null;
 
     if (!slug) {
       return res
@@ -206,15 +207,14 @@ export const getCommunityBasedOnSlug = async (req, res) => {
       .select(
         `
         *,
-        created_by_user:users!communities_created_by_fkey1(
+        owner:users!communities_created_by_fkey1(
           id,
           first_name,
           last_name,
           image,
           email
         ),
-     
-        community_members(
+        members:community_members(
           id,
           user_id,
           role,
@@ -228,7 +228,7 @@ export const getCommunityBasedOnSlug = async (req, res) => {
             email
           )
         ),
-        posts:posts!left(
+        community_posts:posts(
           id,
           title,
           created_at,
@@ -252,13 +252,13 @@ export const getCommunityBasedOnSlug = async (req, res) => {
       throw communityError;
     }
 
-    // Check if user is a member
+    // Check if user is a member (only if user is authenticated)
     let is_member = false;
     let user_role = null;
     let user_member_id = null;
 
-    if (user_id && community.community_members) {
-      const userMember = community.community_members.find(
+    if (user_id && community.members) {
+      const userMember = community.members.find(
         (member) => member.user_id === user_id,
       );
       is_member = !!userMember;
@@ -267,35 +267,30 @@ export const getCommunityBasedOnSlug = async (req, res) => {
     }
 
     // Calculate counts
-    const member_count = community.community_members?.length || 0;
-    const post_count = community.posts?.length || 0;
+    const member_count = community.members?.length || 0;
+    const post_count = community.community_posts?.length || 0;
 
-    // Get moderator and admin lists
-    const moderators =
-      community.community_members
-        ?.filter((member) => member.role === "moderator")
-        .map((member) => ({
-          id: member.user.id,
-          name: `${member.user.first_name || ""} ${member.user.last_name || ""}`.trim(),
-          image: member.user.image,
-          role: member.role,
-          joined_at: member.joined_at,
-        })) || [];
+    // Get ALL members (not filtered by role)
+    const all_members =
+      community.members?.map((member) => ({
+        id: member.user.id,
+        name: `${member.user.first_name || ""} ${member.user.last_name || ""}`.trim(),
+        image: member.user.image,
+        role: member.role,
+        joined_at: member.joined_at,
+        user_id: member.user_id,
+        member_id: member.id,
+      })) || [];
 
-    const admins =
-      community.community_members
-        ?.filter((member) => member.role === "admin")
-        .map((member) => ({
-          id: member.user.id,
-          name: `${member.user.first_name || ""} ${member.user.last_name || ""}`.trim(),
-          image: member.user.image,
-          role: member.role,
-          joined_at: member.joined_at,
-        })) || [];
+    // Get moderator and admin lists (filtered by role)
+    const moderators = all_members.filter(
+      (member) => member.role === "moderator",
+    );
+    const admins = all_members.filter((member) => member.role === "admin");
 
     // Get recent posts (limit to 5)
     const recent_posts =
-      community.posts
+      community.community_posts
         ?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 5)
         .map((post) => ({
@@ -321,18 +316,24 @@ export const getCommunityBasedOnSlug = async (req, res) => {
         banner_url: community.banner_url,
         rules: community.rules,
         status: community.status,
+        is_approved: community.is_approved || false,
         tags: community.tags,
         created_at: community.created_at,
         updated_at: community.updated_at,
         archived_at: community.archived_at,
+        category: community.category,
 
         // Owner info
         owner: {
-          id: community.created_by_user?.id,
-          name: `${community.created_by_user?.first_name || ""} ${community.created_by_user?.last_name || ""}`.trim(),
-          image: community.created_by_user?.image,
-          email: community.created_by_user?.email,
+          id: community.owner?.id,
+          name: `${community.owner?.first_name || ""} ${community.owner?.last_name || ""}`.trim(),
+          image: community.owner?.image,
+          email: community.owner?.email,
         },
+
+        // Approved info (if exists in your schema)
+        approved_by: community.approved_by,
+        approved_at: community.approved_at,
 
         // Counts
         stats: {
@@ -342,7 +343,7 @@ export const getCommunityBasedOnSlug = async (req, res) => {
           admins: admins.length,
         },
 
-        // User-specific data
+        // User-specific data (will be false/null if not authenticated)
         user_status: {
           is_member,
           role: user_role,
@@ -354,15 +355,14 @@ export const getCommunityBasedOnSlug = async (req, res) => {
             community.created_by === user_id,
         },
 
-        // Leadership
+        // Member lists
+        members: all_members, // This is the NEW line - all members
         moderators,
         admins,
 
         // Recent activity
         recent_posts,
 
-        // Additional metadata
-        is_private: community.is_private || false,
         last_activity: community.updated_at,
       },
     };
@@ -466,21 +466,11 @@ export const getCommunityBasedOnOwnerID = async (req, res) => {
 export const getUserJoinedCommunities = async (req, res) => {
   try {
     const { user_id } = req.params;
-    const current_user_id = req.user?.id;
 
     if (!user_id) {
       return res.status(400).json({
         success: false,
         message: "User ID is required",
-      });
-    }
-
-    // Check if user is viewing their own data or is admin
-    const canView = user_id === current_user_id || req.user?.role === "admin";
-    if (!canView) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to view this user's communities",
       });
     }
 
